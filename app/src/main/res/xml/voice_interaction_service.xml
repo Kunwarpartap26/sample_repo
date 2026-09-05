@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Voice Interaction Service Configuration
+    Registered with Android OS to handle:
+    - Hardware home button long-press
+    - Lock-screen voice sessions
+    - Search button invocation
+
+    NOTE: android:recognitionService is intentionally OMITTED.
+    We consume the system's SpeechRecognizer inside our session (Option A architecture)
+    rather than providing a custom RecognitionService. This avoids a type mismatch:
+    VoiceInteractionService ≠ android.speech.RecognitionService.
+-->
+<voice-interaction-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="com.detassist/.DetAssistVoiceInteractionSessionService"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="true" />

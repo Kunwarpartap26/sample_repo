@@ -1,0 +1,33 @@
+# DetAssist .gitignore
+
+# Build outputs
+build/
+dist/
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+.gradle/
+local.properties
+
+# Native build
+.cxx/
+**/CMakeFiles/
+**/cmake-build-*/
+
+# Dependencies
+node_modules/
+
+# Model files (large binaries — do not commit)
+app/src/main/assets/vosk-model/conf/
+app/src/main/assets/vosk-model/graph/
+app/src/main/assets/vosk-model/am/
+app/src/main/assets/vosk-model/ivector/
+app/src/main/assets/porcupine/*.ppn
+app/src/main/jniLibs/**/*.so
+
+# OS files
+.DS_Store
+Thumbs.db

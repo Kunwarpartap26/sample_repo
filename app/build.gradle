@@ -1,0 +1,80 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.detassist'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.detassist"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a'
+        }
+
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++17', '-O2', '-fno-exceptions', '-fno-rtti'
+                arguments '-DANDROID_STL=c++_static'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path 'src/main/cpp/CMakeLists.txt'
+            version '3.22.1'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            debuggable true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    // FIX (8.1): Enable unit test support
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            returnDefaultValues = true  // Return defaults for Android framework classes in unit tests
+        }
+    }
+
+    lint {
+        abortOnError false
+        disable 'MissingTranslation'
+    }
+}
+
+dependencies {
+    // Minimal dependencies
+    implementation 'androidx.core:core:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+
+    // FIX (8.1): Unit test dependencies
+    testImplementation 'junit:junit:4.13.2'
+
+    // FIX (1.4): Vosk offline STT library (optional — app degrades gracefully without it)
+    // Uncomment after placing Vosk model files in assets/vosk-model/
+    // implementation 'com.alphacephei:vosk-android:0.3.47'
+
+    // NO ML Kit, NO TensorFlow Lite, NO neural network dependencies for intent parsing
+    // NO cloud service SDKs
+}
