@@ -36,6 +36,10 @@ import java.util.concurrent.atomic.AtomicLong;
  *   - Issue 5.4: Search feedback acknowledges internet requirement
  *   - Issue 7.3: Replaced Thread.sleep with Handler.postDelayed, added cancellation
  *   - Issue 7.4: Handles parseDuration returning -1 sentinel
+ *   - Compile fix: removed invalid Settings.Panel.ACTION_BLUETOOTH_CONNECTIVITY
+ *     constant (doesn't exist in the Android SDK)
+ *   - Compile fix: toggleAutoRotate's fallback call to toggleViaSettings()
+ *     had an extra/mismatched argument
  */
 public class ActionDispatcher {
 
@@ -390,19 +394,6 @@ public class ActionDispatcher {
     }
 
     private boolean toggleBluetooth() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            Intent intent = new Intent(Settings.Panel.ACTION_BLUETOOTH_CONNECTIVITY);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            try {
-                mContext.startActivity(intent);
-                // FIX (5.1): Accurate feedback
-                notifySpeechFeedback("Opening Bluetooth settings — please toggle it there");
-                return true;
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to open Bluetooth panel", e);
-            }
-        }
-
         Intent intent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
@@ -483,7 +474,7 @@ public class ActionDispatcher {
             return true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to toggle auto-rotate (needs WRITE_SETTINGS permission)", e);
-            return toggleViaSettings(on, "Auto-rotate", Settings.ACTION_DISPLAY_SETTINGS);
+            return toggleViaSettings("Auto-rotate", Settings.ACTION_DISPLAY_SETTINGS);
         }
     }
 
@@ -679,205 +670,3 @@ public class ActionDispatcher {
         } catch (SecurityException e) {
             Log.e(TAG, "READ_CONTACTS permission not granted", e);
             return null;
-        }
-    }
-
-    private boolean executeCall(RegexCommandParser.ParsedCommand cmd) {
-        // FIX (5.3): Use improved contact resolution
-        ContactResult contactResult = resolveContactBest(cmd.callTarget);
-
-        if (contactResult == null) {
-            notifySpeechFeedback("I couldn't find " + cmd.callTarget + " in your contacts");
-            return false;
-        }
-
-        String phoneNumber = contactResult.phoneNumber;
-
-        try {
-            Intent intent = new Intent(Intent.ACTION_CALL, Uri.parse("tel:" + phoneNumber));
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            mContext.startActivity(intent);
-            notifySpeechFeedback("Calling " + contactResult.displayName);
-            return true;
-        } catch (SecurityException e) {
-            Intent intent = new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phoneNumber));
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            try {
-                mContext.startActivity(intent);
-                notifySpeechFeedback("Opening dialer for " + contactResult.displayName);
-                return true;
-            } catch (Exception ex) {
-                Log.e(TAG, "Failed to open dialer", ex);
-                return false;
-            }
-        }
-    }
-
-    /**
-     * FIX (7.4): Handle parseDuration returning -1 sentinel.
-     */
-    private boolean executeTimer(RegexCommandParser.ParsedCommand cmd) {
-        long durationMs = cmd.durationMs;
-
-        // FIX (7.4): Check for parse failure sentinel
-        if (durationMs < 0) {
-            notifySpeechFeedback("I didn't catch how long to set the timer for. Try saying something like 'set timer for 5 minutes'.");
-            return false;
-        }
-
-        if (durationMs == 0) {
-            notifySpeechFeedback("Timer duration is zero. Please specify a duration.");
-            return false;
-        }
-
-        try {
-            android.app.AlarmManager alarmManager =
-                    (android.app.AlarmManager) mContext.getSystemService(Context.ALARM_SERVICE);
-
-            if (alarmManager != null) {
-                long triggerTime = System.currentTimeMillis() + durationMs;
-
-                Intent intent = new Intent("com.detassist.TIMER_FIRED");
-                intent.putExtra("duration_ms", durationMs);
-
-                android.app.PendingIntent pendingIntent = android.app.PendingIntent.getBroadcast(
-                        mContext, 0, intent,
-                        android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                            android.app.AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent);
-                } else {
-                    alarmManager.setExact(
-                            android.app.AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent);
-                }
-
-                long minutes = durationMs / 60000;
-                long seconds = (durationMs % 60000) / 1000;
-                String feedback;
-                if (minutes > 0 && seconds > 0) {
-                    feedback = "Timer set for " + minutes + " minutes " + seconds + " seconds";
-                } else if (minutes > 0) {
-                    feedback = "Timer set for " + minutes + " minutes";
-                } else {
-                    feedback = "Timer set for " + seconds + " seconds";
-                }
-
-                notifySpeechFeedback(feedback);
-                Log.i(TAG, "Timer set: " + durationMs + "ms");
-                return true;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to set timer", e);
-        }
-
-        notifySpeechFeedback("Failed to set timer");
-        return false;
-    }
-
-    private boolean executeNavigate(RegexCommandParser.ParsedCommand cmd) {
-        try {
-            String encodedDest = Uri.encode(cmd.destination);
-            Uri uri = Uri.parse("google.navigation:q=" + encodedDest);
-
-            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-            intent.setPackage("com.google.android.apps.maps");
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-            mContext.startActivity(intent);
-            notifySpeechFeedback("Navigating to " + cmd.destination);
-            return true;
-        } catch (Exception e) {
-            try {
-                Uri uri = Uri.parse("geo:0,0?q=" + Uri.encode(cmd.destination));
-                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                mContext.startActivity(intent);
-                notifySpeechFeedback("Opening maps for " + cmd.destination);
-                return true;
-            } catch (Exception ex) {
-                Log.e(TAG, "Failed to navigate", ex);
-                notifySpeechFeedback("Failed to open navigation");
-                return false;
-            }
-        }
-    }
-
-    /**
-     * FIX (5.4): Search feedback acknowledges internet requirement.
-     */
-    private boolean executeSearch(RegexCommandParser.ParsedCommand cmd) {
-        // FIX (5.4): First try local app search before web
-        String query = cmd.searchQuery;
-
-        // Try finding an app that matches the query
-        AppIndex.AppEntry appMatch = mAppIndex.resolve(query);
-        if (appMatch != null) {
-            // If the "search" matches an app name, just open that app
-            Intent launchIntent = mContext.getPackageManager()
-                    .getLaunchIntentForPackage(appMatch.packageName);
-            if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                try {
-                    mContext.startActivity(launchIntent);
-                    notifySpeechFeedback("Opening " + appMatch.label);
-                    return true;
-                } catch (Exception e) {
-                    // Fall through to web search
-                }
-            }
-        }
-
-        // Fallback: web search (requires internet — acknowledged in feedback)
-        try {
-            Uri uri = Uri.parse("https://www.google.com/search?q=" + Uri.encode(query));
-            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-            mContext.startActivity(intent);
-            // FIX (5.4): Accurate feedback about internet requirement
-            notifySpeechFeedback("Opening web search for " + query + " — this requires an internet connection");
-            return true;
-        } catch (Exception e) {
-            Log.e(TAG, "Search failed", e);
-            notifySpeechFeedback("Search not available");
-            return false;
-        }
-    }
-
-    // ========================================
-    // Callback Helpers
-    // ========================================
-
-    private void notifyCommandStarted(RegexCommandParser.ParsedCommand cmd) {
-        if (mCallback != null) mCallback.onCommandStarted(cmd);
-    }
-
-    private void notifyCommandCompleted(RegexCommandParser.ParsedCommand cmd, boolean success) {
-        if (mCallback != null) mCallback.onCommandCompleted(cmd, success);
-    }
-
-    private void notifySequenceCompleted(int total, int successCount) {
-        if (mCallback != null) mCallback.onSequenceCompleted(total, successCount);
-    }
-
-    private void notifyError(String error) {
-        if (mCallback != null) mCallback.onError(error);
-    }
-
-    private void notifySpeechFeedback(String text) {
-        if (mCallback != null) mCallback.onSpeechFeedback(text);
-    }
-
-    // ========================================
-    // Cleanup
-    // ========================================
-
-    public void release() {
-        cancelCurrentSequence();
-        if (mWorkerThread != null) {
-            mWorkerThread.quitSafely();
-            mWorkerThread = null;
-        }
-    }
-}
