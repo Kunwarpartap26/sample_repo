@@ -63,6 +63,14 @@ android {
     }
 }
 
+configurations.all {
+    // FIX: Exclude legacy Kotlin stdlib modules that duplicate classes
+    // now bundled directly in kotlin-stdlib 1.8+ (project uses no Kotlin itself,
+    // these come in transitively via AndroidX libraries below)
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+}
+
 dependencies {
     // Minimal dependencies
     implementation 'androidx.core:core:1.12.0'
