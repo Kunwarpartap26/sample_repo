@@ -22,6 +22,10 @@ import android.util.Log;
  * FLOW:
  *   OS triggers → onReady() → showSession() → VoiceInteractionSessionService
  *   → onNewSession() → DetAssistVoiceInteractionSession (handles STT + commands)
+ *
+ * NOTE: onHandleAssist()/onHandleScreenshot() are callbacks that belong to
+ * VoiceInteractionSession, not VoiceInteractionService — they were removed
+ * from here since VoiceInteractionService doesn't declare them.
  */
 public class DetAssistVoiceInteractionService extends VoiceInteractionService {
 
@@ -50,27 +54,6 @@ public class DetAssistVoiceInteractionService extends VoiceInteractionService {
         // AlwaysOnHotwordDetector could be used if the OEM provides
         // hardware-level keyword detection support (e.g., Qualcomm Sensing Hub).
         // For broad compatibility, we use our own AudioRecord-based approach.
-    }
-
-    /**
-     * Called when the user invokes the assistant (home button long-press, etc.)
-     */
-    @Override
-    public void onHandleAssist(
-            android.os.Bundle data,
-            android.service.voice.AssistStructure structure,
-            android.service.voice.AssistContent content) {
-        super.onHandleAssist(data, structure, content);
-        Log.i(TAG, "onHandleAssist invoked");
-    }
-
-    /**
-     * Called when the assistant is invoked with screen context.
-     */
-    @Override
-    public void onHandleScreenshot(byte[] screenshot) {
-        super.onHandleScreenshot(screenshot);
-        Log.d(TAG, "Screenshot captured for context");
     }
 
     /**
